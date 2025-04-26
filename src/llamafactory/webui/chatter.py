@@ -1,4 +1,4 @@
-# Copyright 2024 the LlamaFactory team.
+# Copyright 2025 the LlamaFactory team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,8 @@
 
 import json
 import os
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Tuple
+from collections.abc import Generator
+from typing import TYPE_CHECKING, Any, Optional
 
 from transformers.utils import is_torch_npu_available
 
@@ -36,23 +37,30 @@ if is_gradio_available():
     import gradio as gr
 
 
-def _format_response(text: str, lang: str) -> str:
-    r"""
-    Post-processes the response text.
+def _escape_html(text: str) -> str:
+    r"""Escape HTML characters."""
+    return text.replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _format_response(text: str, lang: str, escape_html: bool, thought_words: tuple[str, str]) -> str:
+    r"""Post-process the response text.
 
     Based on: https://huggingface.co/spaces/Lyte/DeepSeek-R1-Distill-Qwen-1.5B-Demo-GGUF/blob/main/app.py
     """
-    if "<think>" not in text:
-        return text
+    if thought_words[0] not in text:
+        return _escape_html(text) if escape_html else text
 
-    text = text.replace("<think>", "")
-    result = text.split("</think>", maxsplit=1)
+    text = text.replace(thought_words[0], "")
+    result = text.split(thought_words[1], maxsplit=1)
     if len(result) == 1:
         summary = ALERTS["info_thinking"][lang]
         thought, answer = text, ""
     else:
         summary = ALERTS["info_thought"][lang]
         thought, answer = result
+
+    if escape_html:
+        thought, answer = _escape_html(thought), _escape_html(answer)
 
     return (
         f"<details open><summary class='thinking-summary'><span>{summary}</span></summary>\n\n"
@@ -64,7 +72,7 @@ class WebChatModel(ChatModel):
     def __init__(self, manager: "Manager", demo_mode: bool = False, lazy_init: bool = True) -> None:
         self.manager = manager
         self.demo_mode = demo_mode
-        self.engine: Optional["BaseEngine"] = None
+        self.engine: Optional[BaseEngine] = None
 
         if not lazy_init:  # read arguments from command line
             super().__init__()
@@ -114,6 +122,7 @@ class WebChatModel(ChatModel):
             enable_liger_kernel=(get("top.booster") == "liger_kernel"),
             infer_backend=get("infer.infer_backend"),
             infer_dtype=get("infer.infer_dtype"),
+            vllm_enforce_eager=True,
             trust_remote_code=True,
         )
 
@@ -150,34 +159,40 @@ class WebChatModel(ChatModel):
 
     @staticmethod
     def append(
-        chatbot: List[Dict[str, str]],
-        messages: List[Dict[str, str]],
+        chatbot: list[dict[str, str]],
+        messages: list[dict[str, str]],
         role: str,
         query: str,
-    ) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], str]:
-        r"""
-        Adds the user input to chatbot.
+        escape_html: bool,
+    ) -> tuple[list[dict[str, str]], list[dict[str, str]], str]:
+        r"""Add the user input to chatbot.
 
-        Inputs: infer.chatbot, infer.messages, infer.role, infer.query
-        Output: infer.chatbot, infer.messages
+        Inputs: infer.chatbot, infer.messages, infer.role, infer.query, infer.escape_html
+        Output: infer.chatbot, infer.messages, infer.query
         """
-        return chatbot + [{"role": "user", "content": query}], messages + [{"role": role, "content": query}], ""
+        return (
+            chatbot + [{"role": "user", "content": _escape_html(query) if escape_html else query}],
+            messages + [{"role": role, "content": query}],
+            "",
+        )
 
     def stream(
         self,
-        chatbot: List[Dict[str, str]],
-        messages: List[Dict[str, str]],
+        chatbot: list[dict[str, str]],
+        messages: list[dict[str, str]],
         lang: str,
         system: str,
         tools: str,
         image: Optional[Any],
         video: Optional[Any],
+        audio: Optional[Any],
         max_new_tokens: int,
         top_p: float,
         temperature: float,
-    ) -> Generator[Tuple[List[Dict[str, str]], List[Dict[str, str]]], None, None]:
-        r"""
-        Generates output text in stream.
+        skip_special_tokens: bool,
+        escape_html: bool,
+    ) -> Generator[tuple[list[dict[str, str]], list[dict[str, str]]], None, None]:
+        r"""Generate output text in stream.
 
         Inputs: infer.chatbot, infer.messages, infer.system, infer.tools, infer.image, infer.video, ...
         Output: infer.chatbot, infer.messages
@@ -190,9 +205,11 @@ class WebChatModel(ChatModel):
             tools,
             images=[image] if image else None,
             videos=[video] if video else None,
+            audios=[audio] if audio else None,
             max_new_tokens=max_new_tokens,
             top_p=top_p,
             temperature=temperature,
+            skip_special_tokens=skip_special_tokens,
         ):
             response += new_text
             if tools:
@@ -207,7 +224,7 @@ class WebChatModel(ChatModel):
                 bot_text = "```json\n" + tool_calls + "\n```"
             else:
                 output_messages = messages + [{"role": Role.ASSISTANT.value, "content": result}]
-                bot_text = _format_response(result, lang)
+                bot_text = _format_response(result, lang, escape_html, self.engine.template.thought_words)
 
             chatbot[-1] = {"role": "assistant", "content": bot_text}
             yield chatbot, output_messages

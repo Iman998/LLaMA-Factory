@@ -1,4 +1,4 @@
-# Copyright 2024 the LlamaFactory team.
+# Copyright 2025 the LlamaFactory team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 from ...data import TEMPLATES
 from ...extras.constants import METHODS, SUPPORTED_MODELS
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from gradio.components import Component
 
 
-def create_top() -> Dict[str, "Component"]:
+def create_top() -> dict[str, "Component"]:
     with gr.Row():
         lang = gr.Dropdown(choices=["en", "ru", "zh", "ko", "ja"], value=None, scale=1)
         available_models = list(SUPPORTED_MODELS.keys()) + ["Custom"]
@@ -42,7 +42,7 @@ def create_top() -> Dict[str, "Component"]:
 
     with gr.Row():
         quantization_bit = gr.Dropdown(choices=["none", "8", "4"], value="none", allow_custom_value=True)
-        quantization_method = gr.Dropdown(choices=["bitsandbytes", "hqq", "eetq"], value="bitsandbytes")
+        quantization_method = gr.Dropdown(choices=["bnb", "hqq", "eetq"], value="bnb")
         template = gr.Dropdown(choices=list(TEMPLATES.keys()), value="default")
         rope_scaling = gr.Dropdown(choices=["none", "linear", "dynamic", "yarn", "llama3"], value="none")
         booster = gr.Dropdown(choices=["auto", "flashattn2", "unsloth", "liger_kernel"], value="auto")

@@ -1,4 +1,4 @@
-# Copyright 2024 the LlamaFactory team.
+# Copyright 2025 the LlamaFactory team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 from transformers.trainer_utils import SchedulerType
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from ..engine import Engine
 
 
-def create_train_tab(engine: "Engine") -> Dict[str, "Component"]:
+def create_train_tab(engine: "Engine") -> dict[str, "Component"]:
     input_elems = engine.manager.get_base_elems()
     elem_dict = dict()
 
@@ -299,9 +299,18 @@ def create_train_tab(engine: "Engine") -> Dict[str, "Component"]:
             swanlab_workspace = gr.Textbox()
             swanlab_api_key = gr.Textbox()
             swanlab_mode = gr.Dropdown(choices=["cloud", "local"], value="cloud")
+            swanlab_link = gr.Markdown(visible=False)
 
     input_elems.update(
-        {use_swanlab, swanlab_project, swanlab_run_name, swanlab_workspace, swanlab_api_key, swanlab_mode}
+        {
+            use_swanlab,
+            swanlab_project,
+            swanlab_run_name,
+            swanlab_workspace,
+            swanlab_api_key,
+            swanlab_mode,
+            swanlab_link,
+        }
     )
     elem_dict.update(
         dict(
@@ -312,6 +321,7 @@ def create_train_tab(engine: "Engine") -> Dict[str, "Component"]:
             swanlab_workspace=swanlab_workspace,
             swanlab_api_key=swanlab_api_key,
             swanlab_mode=swanlab_mode,
+            swanlab_link=swanlab_link,
         )
     )
 
@@ -364,7 +374,7 @@ def create_train_tab(engine: "Engine") -> Dict[str, "Component"]:
             loss_viewer=loss_viewer,
         )
     )
-    output_elems = [output_box, progress_bar, loss_viewer]
+    output_elems = [output_box, progress_bar, loss_viewer, swanlab_link]
 
     cmd_preview_btn.click(engine.runner.preview_train, input_elems, output_elems, concurrency_limit=None)
     start_btn.click(engine.runner.run_train, input_elems, output_elems)
@@ -372,8 +382,8 @@ def create_train_tab(engine: "Engine") -> Dict[str, "Component"]:
     resume_btn.change(engine.runner.monitor, outputs=output_elems, concurrency_limit=None)
 
     lang = engine.manager.get_elem_by_id("top.lang")
-    model_name: "gr.Dropdown" = engine.manager.get_elem_by_id("top.model_name")
-    finetuning_type: "gr.Dropdown" = engine.manager.get_elem_by_id("top.finetuning_type")
+    model_name: gr.Dropdown = engine.manager.get_elem_by_id("top.model_name")
+    finetuning_type: gr.Dropdown = engine.manager.get_elem_by_id("top.finetuning_type")
 
     arg_save_btn.click(engine.runner.save_args, input_elems, output_elems, concurrency_limit=None)
     arg_load_btn.click(

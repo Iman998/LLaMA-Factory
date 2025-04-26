@@ -1,4 +1,4 @@
-# Copyright 2024 HuggingFace Inc. and the LlamaFactory team.
+# Copyright 2025 HuggingFace Inc. and the LlamaFactory team.
 #
 # This code is inspired by the HuggingFace's transformers library.
 # https://github.com/huggingface/transformers/blob/v4.40.0/src/transformers/utils/import_utils.py
@@ -40,6 +40,10 @@ def _get_package_version(name: str) -> "Version":
 
 def is_pyav_available():
     return _is_package_available("av")
+
+
+def is_librosa_available():
+    return _is_package_available("librosa")
 
 
 def is_fastapi_available():
@@ -93,3 +97,7 @@ def is_uvicorn_available():
 
 def is_vllm_available():
     return _is_package_available("vllm")
+
+
+def is_sglang_available():
+    return _is_package_available("sglang")

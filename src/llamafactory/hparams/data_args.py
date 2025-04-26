@@ -1,4 +1,4 @@
-# Copyright 2024 HuggingFace Inc. and the LlamaFactory team.
+# Copyright 2025 HuggingFace Inc. and the LlamaFactory team.
 #
 # This code is inspired by the HuggingFace's transformers library.
 # https://github.com/huggingface/transformers/blob/v4.40.0/examples/pytorch/language-modeling/run_clm.py
@@ -16,14 +16,12 @@
 # limitations under the License.
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal, Optional
 
 
 @dataclass
 class DataArguments:
-    r"""
-    Arguments pertaining to what data we are going to input our model for training and evaluation.
-    """
+    r"""Arguments pertaining to what data we are going to input our model for training and evaluation."""
 
     template: Optional[str] = field(
         default=None,
@@ -41,9 +39,9 @@ class DataArguments:
         default="data",
         metadata={"help": "Path to the folder containing the datasets."},
     )
-    image_dir: Optional[str] = field(
+    media_dir: Optional[str] = field(
         default=None,
-        metadata={"help": "Path to the folder containing the images or videos. Defaults to `dataset_dir`."},
+        metadata={"help": "Path to the folder containing the images, videos or audios. Defaults to `dataset_dir`."},
     )
     cutoff_len: int = field(
         default=2048,
@@ -133,8 +131,8 @@ class DataArguments:
         self.dataset = split_arg(self.dataset)
         self.eval_dataset = split_arg(self.eval_dataset)
 
-        if self.image_dir is None:
-            self.image_dir = self.dataset_dir
+        if self.media_dir is None:
+            self.media_dir = self.dataset_dir
 
         if self.dataset is None and self.val_size > 1e-6:
             raise ValueError("Cannot specify `val_size` if `dataset` is None.")
@@ -162,5 +160,11 @@ class DataArguments:
         if self.mask_history and self.train_on_prompt:
             raise ValueError("`mask_history` is incompatible with `train_on_prompt`.")
 
-    def to_dict(self) -> Dict[str, Any]:
+        if self.neat_packing:
+            self.packing = True
+
+        if self.packing:
+            self.cutoff_len -= 1  # avoid pad_to_multiple_of, needs improve
+
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)

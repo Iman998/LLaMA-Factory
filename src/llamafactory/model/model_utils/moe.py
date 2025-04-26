@@ -1,4 +1,4 @@
-# Copyright 2024 the LlamaFactory team.
+# Copyright 2025 the LlamaFactory team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 import torch
 from transformers.integrations import is_deepspeed_zero3_enabled
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from ...hparams import ModelArguments
 
 
-def _set_z3_leaf_modules(model: "PreTrainedModel", leaf_modules: Sequence["torch.nn.Module"]) -> None:
+def _set_z3_leaf_modules(model: "PreTrainedModel", leaf_modules: list["torch.nn.Module"]) -> None:
     check_version("deepspeed>=0.13.0")
     from deepspeed.utils import set_z3_leaf_modules  # type: ignore
 
@@ -34,9 +34,7 @@ def _set_z3_leaf_modules(model: "PreTrainedModel", leaf_modules: Sequence["torch
 
 
 def add_z3_leaf_module(model: "PreTrainedModel") -> None:
-    r"""
-    Sets module as a leaf module to skip partitioning in deepspeed zero3.
-    """
+    r"""Set module as a leaf module to skip partitioning in deepspeed zero3."""
     if not is_deepspeed_zero3_enabled():
         return
 

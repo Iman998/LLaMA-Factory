@@ -1,4 +1,4 @@
-# Copyright 2024 the LlamaFactory team.
+# Copyright 2025 the LlamaFactory team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +13,12 @@
 # limitations under the License.
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal, Optional
 
 
 @dataclass
 class FreezeArguments:
-    r"""
-    Arguments pertaining to the freeze (partial-parameter) training.
-    """
+    r"""Arguments pertaining to the freeze (partial-parameter) training."""
 
     freeze_trainable_layers: int = field(
         default=2,
@@ -56,9 +54,7 @@ class FreezeArguments:
 
 @dataclass
 class LoraArguments:
-    r"""
-    Arguments pertaining to the LoRA training.
-    """
+    r"""Arguments pertaining to the LoRA training."""
 
     additional_target: Optional[str] = field(
         default=None,
@@ -128,9 +124,7 @@ class LoraArguments:
 
 @dataclass
 class RLHFArguments:
-    r"""
-    Arguments pertaining to the PPO, DPO and KTO training.
-    """
+    r"""Arguments pertaining to the PPO, DPO and KTO training."""
 
     pref_beta: float = field(
         default=0.1,
@@ -212,9 +206,7 @@ class RLHFArguments:
 
 @dataclass
 class GaloreArguments:
-    r"""
-    Arguments pertaining to the GaLore algorithm.
-    """
+    r"""Arguments pertaining to the GaLore algorithm."""
 
     use_galore: bool = field(
         default=False,
@@ -253,9 +245,7 @@ class GaloreArguments:
 
 @dataclass
 class ApolloArguments:
-    r"""
-    Arguments pertaining to the APOLLO algorithm.
-    """
+    r"""Arguments pertaining to the APOLLO algorithm."""
 
     use_apollo: bool = field(
         default=False,
@@ -306,9 +296,7 @@ class ApolloArguments:
 
 @dataclass
 class BAdamArgument:
-    r"""
-    Arguments pertaining to the BAdam optimizer.
-    """
+    r"""Arguments pertaining to the BAdam optimizer."""
 
     use_badam: bool = field(
         default=False,
@@ -363,15 +351,15 @@ class SwanLabArguments:
         default=False,
         metadata={"help": "Whether or not to use the SwanLab (an experiment tracking and visualization tool)."},
     )
-    swanlab_project: str = field(
+    swanlab_project: Optional[str] = field(
         default="llamafactory",
         metadata={"help": "The project name in SwanLab."},
     )
-    swanlab_workspace: str = field(
+    swanlab_workspace: Optional[str] = field(
         default=None,
         metadata={"help": "The workspace name in SwanLab."},
     )
-    swanlab_run_name: str = field(
+    swanlab_run_name: Optional[str] = field(
         default=None,
         metadata={"help": "The experiment name in SwanLab."},
     )
@@ -379,19 +367,29 @@ class SwanLabArguments:
         default="cloud",
         metadata={"help": "The mode of SwanLab."},
     )
-    swanlab_api_key: str = field(
+    swanlab_api_key: Optional[str] = field(
         default=None,
         metadata={"help": "The API key for SwanLab."},
+    )
+    swanlab_logdir: Optional[str] = field(
+        default=None,
+        metadata={"help": "The log directory for SwanLab."},
+    )
+    swanlab_lark_webhook_url: Optional[str] = field(
+        default=None,
+        metadata={"help": "The Lark(飞书) webhook URL for SwanLab."},
+    )
+    swanlab_lark_secret: Optional[str] = field(
+        default=None,
+        metadata={"help": "The Lark(飞书) secret for SwanLab."},
     )
 
 
 @dataclass
 class FinetuningArguments(
-    FreezeArguments, LoraArguments, RLHFArguments, GaloreArguments, ApolloArguments, BAdamArgument, SwanLabArguments
+    SwanLabArguments, BAdamArgument, ApolloArguments, GaloreArguments, RLHFArguments, LoraArguments, FreezeArguments
 ):
-    r"""
-    Arguments pertaining to which techniques we are going to fine-tuning with.
-    """
+    r"""Arguments pertaining to which techniques we are going to fine-tuning with."""
 
     pure_bf16: bool = field(
         default=False,
@@ -415,15 +413,15 @@ class FinetuningArguments(
     )
     freeze_vision_tower: bool = field(
         default=True,
-        metadata={"help": "Whether ot not to freeze vision tower in MLLM training."},
+        metadata={"help": "Whether ot not to freeze the vision tower in MLLM training."},
     )
     freeze_multi_modal_projector: bool = field(
         default=True,
         metadata={"help": "Whether or not to freeze the multi modal projector in MLLM training."},
     )
-    train_mm_proj_only: bool = field(
+    freeze_language_model: bool = field(
         default=False,
-        metadata={"help": "Whether or not to train the multimodal projector for MLLM only."},
+        metadata={"help": "Whether or not to freeze the language model in MLLM training."},
     )
     compute_accuracy: bool = field(
         default=False,
@@ -448,15 +446,13 @@ class FinetuningArguments(
                 return [item.strip() for item in arg.split(",")]
             return arg
 
-        self.freeze_trainable_modules: List[str] = split_arg(self.freeze_trainable_modules)
-        self.freeze_extra_modules: Optional[List[str]] = split_arg(self.freeze_extra_modules)
+        self.freeze_trainable_modules: list[str] = split_arg(self.freeze_trainable_modules)
+        self.freeze_extra_modules: Optional[list[str]] = split_arg(self.freeze_extra_modules)
         self.lora_alpha: int = self.lora_alpha or self.lora_rank * 2
-        self.lora_target: List[str] = split_arg(self.lora_target)
-        self.additional_target: Optional[List[str]] = split_arg(self.additional_target)
-        self.galore_target: List[str] = split_arg(self.galore_target)
-        self.apollo_target: List[str] = split_arg(self.apollo_target)
-        self.freeze_vision_tower = self.freeze_vision_tower or self.train_mm_proj_only
-        self.freeze_multi_modal_projector = self.freeze_multi_modal_projector and not self.train_mm_proj_only
+        self.lora_target: list[str] = split_arg(self.lora_target)
+        self.additional_target: Optional[list[str]] = split_arg(self.additional_target)
+        self.galore_target: list[str] = split_arg(self.galore_target)
+        self.apollo_target: list[str] = split_arg(self.apollo_target)
         self.use_ref_model = self.stage == "dpo" and self.pref_loss not in ["orpo", "simpo"]
 
         assert self.finetuning_type in ["lora", "freeze", "full"], "Invalid fine-tuning method."
@@ -484,9 +480,6 @@ class FinetuningArguments(
         if self.pissa_init and (self.stage in ["ppo", "kto"] or self.use_ref_model):
             raise ValueError("Cannot use PiSSA for current training stage.")
 
-        if self.train_mm_proj_only and self.finetuning_type != "full":
-            raise ValueError("`train_mm_proj_only` is only valid for full training.")
-
         if self.finetuning_type != "lora":
             if self.loraplus_lr_ratio is not None:
                 raise ValueError("`loraplus_lr_ratio` is only valid for LoRA training.")
@@ -500,7 +493,7 @@ class FinetuningArguments(
             if self.pissa_init:
                 raise ValueError("`pissa_init` is only valid for LoRA training.")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         args = asdict(self)
         args = {k: f"<{k.upper()}>" if k.endswith("api_key") else v for k, v in args.items()}
         return args

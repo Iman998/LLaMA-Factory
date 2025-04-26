@@ -1,0 +1,15 @@
+artifact_uri: file:///data/Iman/LLM/training/LLaMA-Factory/mlruns/0/28aff773b01541e0927c9d8a83a7038d/artifacts
+end_time: 1741674915494
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 28aff773b01541e0927c9d8a83a7038d
+run_name: full_20_layers_sft
+run_uuid: 28aff773b01541e0927c9d8a83a7038d
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1741674900238
+status: 3
+tags: []
+user_id: deployer

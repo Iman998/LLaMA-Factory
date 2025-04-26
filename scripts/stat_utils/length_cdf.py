@@ -1,4 +1,4 @@
-# Copyright 2024 the LlamaFactory team.
+# Copyright 2025 the LlamaFactory team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,8 +29,8 @@ def length_cdf(
     template: str = "default",
     interval: int = 1000,
 ):
-    r"""
-    Calculates the distribution of the input lengths in the dataset.
+    r"""Calculate the distribution of the input lengths in the dataset.
+
     Usage: export CUDA_VISIBLE_DEVICES=0
     python length_cdf.py --model_name_or_path path_to_model --dataset alpaca_en_demo --template default
     """

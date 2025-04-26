@@ -1,0 +1,15 @@
+artifact_uri: file:///data/Iman/LLM/training/LLaMA-Factory/mlruns/0/3429b776a06d4951bd93976ee03d1de9/artifacts
+end_time: 1745168769752
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 3429b776a06d4951bd93976ee03d1de9
+run_name: /data/Iman/lora_models/Llama-3.1-8B-Instruct-fawiki-political-sft-new
+run_uuid: 3429b776a06d4951bd93976ee03d1de9
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1745168720587
+status: 3
+tags: []
+user_id: deployer

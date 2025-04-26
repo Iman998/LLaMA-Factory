@@ -1,0 +1,15 @@
+artifact_uri: file:///data/Iman/LLM/training/LLaMA-Factory/mlruns/0/6b7e269ac10a4a90b2fc2aebdbd24a2f/artifacts
+end_time: 1741169263075
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 6b7e269ac10a4a90b2fc2aebdbd24a2f
+run_name: /data/Iman/LLM/models/dolphin
+run_uuid: 6b7e269ac10a4a90b2fc2aebdbd24a2f
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1741168398419
+status: 3
+tags: []
+user_id: deployer

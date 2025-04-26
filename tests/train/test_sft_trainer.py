@@ -1,4 +1,4 @@
-# Copyright 2024 the LlamaFactory team.
+# Copyright 2025 the LlamaFactory team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 from transformers import DataCollatorWithPadding
@@ -27,10 +27,10 @@ from llamafactory.train.sft.trainer import CustomSeq2SeqTrainer
 
 DEMO_DATA = os.getenv("DEMO_DATA", "llamafactory/demo_data")
 
-TINY_LLAMA = os.getenv("TINY_LLAMA", "llamafactory/tiny-random-Llama-3")
+TINY_LLAMA3 = os.getenv("TINY_LLAMA3", "llamafactory/tiny-random-Llama-3")
 
 TRAIN_ARGS = {
-    "model_name_or_path": TINY_LLAMA,
+    "model_name_or_path": TINY_LLAMA3,
     "stage": "sft",
     "do_train": True,
     "finetuning_type": "lora",
@@ -38,18 +38,18 @@ TRAIN_ARGS = {
     "dataset_dir": "ONLINE",
     "template": "llama3",
     "cutoff_len": 1024,
-    "overwrite_cache": False,
     "overwrite_output_dir": True,
     "per_device_train_batch_size": 1,
     "max_steps": 1,
+    "report_to": "none",
 }
 
 
 @dataclass
 class DataCollatorWithVerbose(DataCollatorWithPadding):
-    verbose_list: List[Dict[str, Any]] = field(default_factory=list)
+    verbose_list: list[dict[str, Any]] = field(default_factory=list)
 
-    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
         self.verbose_list.extend(features)
         batch = super().__call__(features)
         return {k: v[:, :1] for k, v in batch.items()}  # truncate input length
