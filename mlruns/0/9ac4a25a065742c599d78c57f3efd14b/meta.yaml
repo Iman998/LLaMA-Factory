@@ -1,0 +1,15 @@
+artifact_uri: file:///data/Iman/LLM/training/LLaMA-Factory/mlruns/0/9ac4a25a065742c599d78c57f3efd14b/artifacts
+end_time: 1745744230028
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 9ac4a25a065742c599d78c57f3efd14b
+run_name: capable-auk-759
+run_uuid: 9ac4a25a065742c599d78c57f3efd14b
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1745744172009
+status: 3
+tags: []
+user_id: deployer

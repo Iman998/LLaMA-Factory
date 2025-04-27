@@ -1,0 +1,51 @@
+### model
+model_name_or_path: /data/models/gemma-3-12b-it
+trust_remote_code: true
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_rank: 256
+lora_target: all
+lora_dropout: 0.001
+deepspeed: examples/deepspeed/ds_z0_config.json  # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
+
+### dataset
+dataset: alpaca_en_demo
+template: gemma3
+cutoff_len: 1024
+max_samples: 200
+overwrite_cache: true
+preprocessing_num_workers: 1
+dataloader_num_workers: 1
+
+### output
+output_dir: /data/Iman/lora_models/gemma3-test
+logging_steps: 1
+save_strategy: steps
+save_steps: 40000
+plot_loss: true
+overwrite_output_dir: true
+save_only_model: false
+
+### train
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 1
+learning_rate: 1.0e-4
+num_train_epochs: 2.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+bf16: true
+ddp_timeout: 180000000
+
+### eval
+do_eval: true
+eval_dataset: alpaca_en_demo2
+per_device_eval_batch_size: 8
+eval_strategy: steps
+eval_steps: 10
+
+##predict
+do_predict: true
+predict_with_generate: true

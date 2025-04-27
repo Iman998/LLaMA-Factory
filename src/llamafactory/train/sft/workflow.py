@@ -129,13 +129,20 @@ def run_sft(
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
 
-    # Predict
+    # Predict - Remove hardcoded path and use generating_args
     if training_args.do_predict:
         logger.warning_rank0_once("Batch generation can be very slow. Consider using `scripts/vllm_infer.py` instead.")
         predict_results = trainer.predict(dataset_module["eval_dataset"], metric_key_prefix="predict", **gen_kwargs)
         trainer.log_metrics("predict", predict_results.metrics)
         trainer.save_metrics("predict", predict_results.metrics)
-        trainer.save_predictions(dataset_module["eval_dataset"], predict_results, generating_args.skip_special_tokens)
+        
+        # Use generating_args for output path
+        trainer.save_predictions(
+            dataset_module["eval_dataset"],
+            predict_results,
+            skip_special_tokens=generating_args.skip_special_tokens,
+            output_path=finetuning_args.output_dir + '/generation'
+        )
 
     # Create model card
     create_modelcard_and_push(trainer, model_args, data_args, training_args, finetuning_args)

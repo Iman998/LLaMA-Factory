@@ -1,0 +1,15 @@
+artifact_uri: file:///data/Iman/LLM/training/LLaMA-Factory/mlruns/0/7622f6e5068e416ab1930deeb6398181/artifacts
+end_time: 1745681471134
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 7622f6e5068e416ab1930deeb6398181
+run_name: /data/Iman/lora_models/gemma3-test
+run_uuid: 7622f6e5068e416ab1930deeb6398181
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1745681425116
+status: 3
+tags: []
+user_id: deployer

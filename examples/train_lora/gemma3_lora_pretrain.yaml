@@ -10,7 +10,7 @@ finetuning_type: lora
 lora_rank: 256
 lora_target: all
 lora_dropout: 0.001
-freeze_vision_tower: false
+freeze_vision_tower: true
 deepspeed: examples/deepspeed/ds_z0_config.json  # choices: [ds_z0_config.json, ds_z2_config.json, ds_z3_config.json]
 
 ### dataset
