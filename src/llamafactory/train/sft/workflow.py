@@ -92,6 +92,7 @@ def run_sft(
         data_collator=data_collator,
         callbacks=callbacks,
         gen_kwargs=gen_kwargs,
+        do_khayyam=True,   
         **dataset_module,
         **tokenizer_module,
         **metric_module,
@@ -141,7 +142,7 @@ def run_sft(
             dataset_module["eval_dataset"],
             predict_results,
             skip_special_tokens=generating_args.skip_special_tokens,
-            output_path=finetuning_args.output_dir + '/generation'
+            output_path= None
         )
 
     # Create model card

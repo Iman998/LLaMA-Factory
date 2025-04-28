@@ -21,6 +21,7 @@ from types import MethodType
 from typing import TYPE_CHECKING, Any, Optional, Union, List
 
 import numpy as np
+import pandas as pd  
 import torch
 from transformers import Seq2SeqTrainer
 from typing_extensions import override
@@ -30,6 +31,13 @@ from ...extras.constants import IGNORE_INDEX
 from ...extras.packages import is_transformers_version_greater_than
 from ..callbacks import SaveProcessorCallback
 from ..trainer_utils import create_custom_optimizer, create_custom_scheduler
+
+import datasets
+from .khayyam_utils import (
+    khayyam_choice_metrics,
+    build_prompt,
+    PROMPT_TEMPLATE,
+)
 
 if TYPE_CHECKING:
     from torch.utils.data import Dataset
@@ -49,6 +57,8 @@ class CustomSeq2SeqTrainer(Seq2SeqTrainer):
         finetuning_args: "FinetuningArguments",
         processor: Optional["ProcessorMixin"],
         gen_kwargs: Optional[dict[str, Any]] = None,
+        do_khayyam: bool = False,
+        khayyam_csv: str = "/data/Iman/evaluation/khayyam_challenge/khayyam_challenge_sample.csv",
         **kwargs,
     ) -> None:
         if is_transformers_version_greater_than("4.46"):
@@ -57,6 +67,10 @@ class CustomSeq2SeqTrainer(Seq2SeqTrainer):
             self.processing_class: "PreTrainedTokenizer" = kwargs.get("tokenizer")
 
         super().__init__(**kwargs)
+        self.do_khayyam = do_khayyam
+        self._khayyam_ds = None
+        if self.do_khayyam:
+            self._khayyam_ds = self._prepare_khayyam_dataset(khayyam_csv)
 
         if processor is not None:
             self.model_accepts_loss_kwargs = False
@@ -71,6 +85,81 @@ class CustomSeq2SeqTrainer(Seq2SeqTrainer):
             self.accelerator.clip_grad_norm_ = MethodType(clip_grad_norm_old_version, self.accelerator)
             self.add_callback(BAdamCallback)
 
+    def _prepare_khayyam_dataset(self, csv_path: str):
+        tok      = self.processing_class          # same tokenizer you pass to Trainer
+        max_len  = getattr(self.args, "max_length", 2048)
+        df       = pd.read_csv(csv_path)
+
+        class KhayyamTorchDataset(torch.utils.data.Dataset):
+            def __init__(self, frame):
+                self.df      = frame.reset_index(drop=True)
+                self.prompts = []          # raw prompt strings (for saving later)
+                self.ids     = []          # list[int]  token ids
+                self.masks   = []          # list[int]  attn masks
+                self.labels_txt = []       # **ground-truth answer text**
+                self._levels   = self.df.get("Level", []).tolist()
+                self._cats_fa  = self.df.get("final_category_fa", []).tolist()
+
+                for _, row in self.df.iterrows():
+                    # ---------------- build the user question + choices --------
+                    q_line = f"Question: {row['Question Body']}"
+                    choice_lines = [
+                        f"{i}) {row[f'Choice {i}']}" for i in range(1, 5)
+                    ]
+                    user_msg = q_line + "\n" + "\n".join(choice_lines)
+
+                    # ---------------- feed messages to chat-template -----------
+                    messages = [
+                        {"role": "system", "content": PROMPT_TEMPLATE},
+                        {"role": "user",   "content": user_msg},
+                    ]
+                    prompt = tok.apply_chat_template(
+                        messages,
+                        tokenize=False,
+                        add_generation_prompt=True,   # makes the template end with <start_of_turn>model\n
+                    )
+
+                    enc = tok(
+                        prompt,
+                        add_special_tokens=False,     # chat template already has BOS & special tags
+                        truncation=True,
+                        max_length=max_len,
+                    )
+
+                    self.prompts.append(prompt)
+                    self.ids.append(enc["input_ids"])
+                    self.masks.append(enc["attention_mask"])
+
+                    # ------------ ground-truth label text for JSONL -----------
+                    k = int(row["Key"])
+                    self.labels_txt.append(k)
+
+            # ------------- PyTorch Dataset interface --------------------------
+            def __len__(self) -> int: return len(self.ids)
+
+            def __getitem__(self, idx):
+                ids = self.ids[idx]
+                return {
+                    "input_ids":      ids,                     # list[int]
+                    "attention_mask": self.masks[idx],         # list[int]
+                    "labels":         [IGNORE_INDEX] * len(ids)  # dummy, evaluation-only
+                }
+
+            # ------------- Helpers for metrics & saving -----------------------
+            @property
+            def keys_true(self): return self.df["Key"].tolist()
+
+            @property
+            def levels(self):           
+                return self._levels
+            
+            @property
+            def cats_fa(self):          
+                return self._cats_fa
+            
+        return KhayyamTorchDataset(df)
+
+    
     @override
     def create_optimizer(self) -> torch.optim.Optimizer:
         if self.optimizer is None:
@@ -125,85 +214,135 @@ class CustomSeq2SeqTrainer(Seq2SeqTrainer):
         eval_dataset=None,
         ignore_keys: Optional[list[str]] = None,
         metric_key_prefix: str = "eval",
-        **gen_kwargs,                      # accept any generate kwargs here
+        **gen_kwargs,
     ):
-        # 1) Standard evaluation → metrics (uses generate() if predict_with_generate=True)
+        # ---- 1) Standard HF evaluation ------------------------------------
         metrics = super().evaluate(
             eval_dataset=eval_dataset,
             ignore_keys=ignore_keys,
             metric_key_prefix=metric_key_prefix,
         )
 
-        # 2) Fetch & save raw predictions, merging default + override gen_kwargs
+        # ---- 2) Save normal eval generations ------------------------------
         if self.args.predict_with_generate:
             ds = eval_dataset if eval_dataset is not None else self.eval_dataset
-            step = int(self.state.global_step)
-
-            # merge trainer._gen_kwargs with passed-in gen_kwargs,
-            # with explicit gen_kwargs taking precedence
-            final_gen_kwargs = {**getattr(self, "_gen_kwargs", {}), **gen_kwargs}
-
+            gen_cfg = {**getattr(self, "_gen_kwargs", {}), **gen_kwargs}
             pred_out = self.predict(
                 ds,
                 ignore_keys=ignore_keys,
-                metric_key_prefix=f"step_{step}_predict",
-                **final_gen_kwargs,
+                metric_key_prefix=f"{metric_key_prefix}_choice",
+                **gen_cfg,
             )
             self.save_predictions(
                 dataset=ds,
                 predict_results=pred_out,
                 skip_special_tokens=True,
-                output_path=self.args.output_dir + '/generation'
+                suffix=f"generation-{self.state.global_step}",
             )
 
+        # ---- 3) Extra Khayyam evaluation (if requested) -------------------
+        if self.do_khayyam and self.args.predict_with_generate:
+            kh_metrics = self._eval_khayyam(ignore_keys, gen_kwargs)
+            metrics.update(kh_metrics)
+
+        self.log(metrics)
         return metrics
 
     def save_predictions(
         self,
-        dataset: "Dataset",
-        predict_results: "PredictionOutput",
-        skip_special_tokens: bool = True,
+        dataset,
+        predict_results,
+        skip_special_tokens=True,
         output_path: Optional[str] = None,
-    ) -> None:
+        suffix: Optional[str] = None,
+    ):
         if not self.is_world_process_zero():
             return
 
         step = int(self.state.global_step)
+        pad  = self.processing_class.pad_token_id
 
-        # Build output file path
-        if output_path:
-            if os.path.isdir(output_path):
-                output_file = os.path.join(output_path, f"predictions_step_{step}.jsonl")
-            else:
-                output_file = output_path
-                os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        base = f"predictions_step_{step}"
+        if suffix:
+            base = f"{base}_{suffix}"
+        if output_path is None:
+            output_file = os.path.join(self.args.output_dir, f"{base}.jsonl")
         else:
-            output_file = os.path.join(self.args.output_dir, f"predictions_step_{step}.jsonl")
+            os.makedirs(output_path, exist_ok=True)
+            output_file = os.path.join(output_path, f"{base}.jsonl")
 
-        logger.info_rank0(f"Saving predictions to {output_file}")
+        # ---------- decode predictions ---------------------------------------
+        preds = np.where(predict_results.predictions != IGNORE_INDEX,
+                        predict_results.predictions, pad)
+        decoded_preds = self.processing_class.batch_decode(preds, skip_special_tokens=True)
 
-        pad_id = self.processing_class.pad_token_id
+        # ---------- recover original prompts ---------------------------------
+        if hasattr(dataset, "prompts"):            # custom Khayyam dataset
+            decoded_inputs = dataset.prompts
+        else:                                      # HF Dataset
+            decoded_inputs = self.processing_class.batch_decode(
+                dataset["input_ids"], skip_special_tokens=False
+            )
 
-        # Replace IGNORE_INDEX with pad_id
-        labels = np.where(predict_results.label_ids != IGNORE_INDEX, predict_results.label_ids, pad_id)
-        preds =  np.where(predict_results.predictions != IGNORE_INDEX, predict_results.predictions, pad_id)
+        # ---------- labels: try label_ids, else fall back to dataset.labels_txt
+        if predict_results.label_ids is not None and np.any(
+            predict_results.label_ids != IGNORE_INDEX
+        ):
+            labels_arr = np.where(
+                predict_results.label_ids != IGNORE_INDEX,
+                predict_results.label_ids,
+                pad,
+            )
+            decoded_labels = self.processing_class.batch_decode(
+                labels_arr, skip_special_tokens=skip_special_tokens
+            )
+        elif hasattr(dataset, "labels_txt"):
+            decoded_labels = dataset.labels_txt
+        else:
+            decoded_labels = [""] * len(decoded_inputs)
 
-        # Rotate each prediction sequence so padding is at the end
-        for i in range(len(preds)):
-            nz = np.nonzero(preds[i] != pad_id)[0]
-            if nz.size > 0:
-                preds[i] = np.concatenate((preds[i][nz[0]:], preds[i][:nz[0]]), axis=-1)
+        # ---------- write JSONL ----------------------------------------------
+        with open(output_file, "w", encoding="utf-8") as w:
+            for idx, (src, pr, lb) in enumerate(zip(decoded_inputs,
+                                                    decoded_preds,
+                                                    decoded_labels)):
+                extra = ""
+                if hasattr(dataset, "levels") and hasattr(dataset, "cats_fa"):
+                    extra = f',"level":{dataset.levels[idx]!r},"category_fa":{dataset.cats_fa[idx]!r}'
+                w.write(
+                    f'{{"prompt":{src!r},"predict-{step}":{pr!r},"label":{lb!r}{extra}}}\n'
+                )
 
-        # Decode inputs, preds, labels
-        decoded_inputs = self.processing_class.batch_decode(dataset["input_ids"], skip_special_tokens=False)
-        decoded_preds  = self.processing_class.batch_decode(preds, skip_special_tokens=skip_special_tokens)
-        decoded_labels = self.processing_class.batch_decode(labels, skip_special_tokens=skip_special_tokens)
+    def _eval_khayyam(self, ignore_keys, gen_kwargs):
+        step    = int(self.state.global_step)
+        gen_cfg = {**getattr(self, "_gen_kwargs", {}), **gen_kwargs}
 
-        # Write out JSONL
-        with open(output_file, "w", encoding="utf-8") as writer:
-            for src, pr, lb in zip(decoded_inputs, decoded_preds, decoded_labels):
-                writer.write(json.dumps({
-                    "prompt": src,
-                    f"predict-{step}": pr,
-                    "label": lb
-                }, ensure_ascii=False) + "\n")
+        pred_out = self.predict(
+            self._khayyam_ds,
+            ignore_keys=ignore_keys,
+            metric_key_prefix=f"khayyam_step_{step}",
+            **gen_cfg,
+        )
+
+        # ---------- SAFE DECODE (fixes OverflowError) -----------------------
+        pad_id  = self.processing_class.pad_token_id
+        pred_arr = np.asarray(pred_out.predictions)
+        pred_arr = np.where(pred_arr < 0, pad_id, pred_arr)
+        preds_txt = self.processing_class.batch_decode(
+            pred_arr.tolist(), skip_special_tokens=True
+        )
+
+        keys_true = self._khayyam_ds.keys_true
+        levels    = self._khayyam_ds.levels
+
+        metrics = khayyam_choice_metrics(
+            preds_txt, keys_true, levels, prefix="khayyam"
+        )
+
+        self.save_predictions(
+            dataset=self._khayyam_ds,
+            predict_results=pred_out,
+            skip_special_tokens=True,
+            suffix=f"khayyam_generation-{step}",
+        )
+        return metrics

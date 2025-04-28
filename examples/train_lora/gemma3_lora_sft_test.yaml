@@ -15,7 +15,7 @@ deepspeed: examples/deepspeed/ds_z0_config.json  # choices: [ds_z0_config.json, 
 dataset: alpaca_en_demo
 template: gemma3
 cutoff_len: 1024
-max_samples: 200
+max_samples: 40
 overwrite_cache: true
 preprocessing_num_workers: 1
 dataloader_num_workers: 1
